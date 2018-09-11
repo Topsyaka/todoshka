@@ -8,19 +8,19 @@ app.use(bodyParser.urlencoded({ extended: false }));
 
 const db = new sqlite.Database(':memory:');
 
-db.all(`CREATE TABLE Todos (id INTEGER PRIMARY KEY, name TEXT, done BOOLEAN)`)
+db.all(`CREATE TABLE Todos (id INTEGER PRIMARY KEY, name TEXT, done BOOLEAN, deleted BOOLEAN)`)
 
 app.get('/todos',  async (req, res) => {
-  const sql = `SELECT * FROM Todos`;
+  const sql = `SELECT * FROM Todos WHERE deleted=0`;
   db.all(sql, [], (err, rows) => res.json(rows));
 });
 
 app.post('/todos', async (req, res) => {
   const name = req.body.name;
-  const sql = `INSERT INTO Todos (name, done) VALUES (?, FALSE)`
+  const sql = `INSERT INTO Todos (name, done, deleted) VALUES (?, FALSE, FALSE)`
   db.all(sql, [name], (err, rows) => {
     if(err) return res.json(result);
-    const sql = `SELECT * FROM Todos`;
+    const sql = `SELECT * FROM Todos WHERE deleted=0`;
     db.all(sql, [], (err, rows) => res.json(rows));
   });
 });
@@ -32,7 +32,7 @@ app.put('/todos', (req, res) => {
     const newStatus = !rows[0].done;
     const sql = `UPDATE Todos SET done=? WHERE id=?`;
     db.all(sql, [newStatus, id], (err, rows) => {
-      const sql = `SELECT * FROM Todos`;
+      const sql = `SELECT * FROM Todos WHERE deleted=0`;
       db.all(sql, [], (err, rows) => res.json(rows));
     });
   })
@@ -41,14 +41,13 @@ app.put('/todos', (req, res) => {
 app.delete('/todos', (req, res) => {
   const query = req.query;
   const id = req.query.id;
-  const sql = `DELETE FROM Todos WHERE id=${id}`;
+  const sql = `UPDATE Todos SET deleted=1 WHERE id=?`;
   if (id) {
-    db.all(sql, [], (err, rows) => {
-      res.json({message: 'Item is deleted'});
-      return;
+    db.all(sql, [id], (err, rows) => {
+      const sql = `SELECT * FROM Todos WHERE deleted=0`;
+      db.all(sql, [], (err, rows) => res.json(rows));
     })
   }
-  res.json({error: 'Sthms went wrong'});
 })
 
 app.listen(4500, () => {
